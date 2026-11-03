@@ -2,24 +2,54 @@ import { Card, Empty } from '@/components/Card'
 import { StudyCalendar } from '@/components/StudyCalendar'
 import { TrendChart } from '@/components/TrendChart'
 import { bandGap, bandProgress } from '@/lib/band'
+import { getDb } from '@/db/client'
+import { loadDashboard } from '@/db/dashboard'
 import { getDemoDashboard } from '@/lib/demo-data'
-import type { Skill } from '@/lib/types'
+import type { DashboardData, Skill } from '@/lib/types'
+
+// Render per request so dates, streaks and due counts are never frozen at build time.
+export const dynamic = 'force-dynamic'
+
+type BannerKind = 'demo' | 'empty' | 'real'
+
+function bannerKind(d: DashboardData): BannerKind {
+  const sources = [
+    d.estimates, d.overall, d.trajectory, d.mocks, d.tasks, d.weakPoints,
+    d.streakDays, d.studiedDates, d.vocabDue, d.mistakesDue, d.advice,
+  ].map((s) => s.source)
+  if (sources.includes('demo')) return 'demo'
+  if (sources.every((s) => s === 'none')) return 'empty'
+  return 'real'
+}
 
 const skillLabel: Record<Skill, string> = { listening: '听力', reading: '阅读', writing: '写作', speaking: '口语' }
 
-// Phase 1: the dashboard is fed by clearly labelled demo data.
-// Phase 2 swaps this call for repository reads of the learner's real records.
-export default function DashboardPage() {
-  const d = getDemoDashboard()
+// Phase 2: reads the learner's real records. Demo data appears only when explicitly requested via /?demo=1,
+// and an empty database stays empty instead of silently falling back to demo values.
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ demo?: string }>
+}) {
+  const { demo } = await searchParams
+  const d = demo === '1' ? getDemoDashboard() : await loadDashboard(getDb())
+  const kind = bannerKind(d)
   const overall = d.overall.data
   const gap = bandGap(overall, d.targetBand)
   const pct = bandProgress(overall, d.targetBand)
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--demo)', color: 'var(--demo)' }}>
-        当前页面显示的是 DEMO 演示数据，不是你的真实成绩。接入真实记录后，标签会自动消失。
-      </div>
+      {kind === 'demo' && (
+        <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--demo)', color: 'var(--demo)' }}>
+          当前页面显示的是 DEMO 演示数据，不是你的真实成绩。去掉地址栏里的 ?demo=1 即可查看真实记录。
+        </div>
+      )}
+      {kind === 'empty' && (
+        <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--line)', color: 'var(--muted)' }}>
+          还没有任何学习记录，所以这里不显示分数。完成学习诊断或录入第一次练习后，驾驶舱会自动填充。想预览版面可访问 /?demo=1。
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title={`IELTS ${d.targetBand.toFixed(1)} 目标进度`} source={d.overall.source} className="lg:col-span-1">
