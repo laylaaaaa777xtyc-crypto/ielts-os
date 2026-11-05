@@ -2,6 +2,7 @@
   "name": "ielts-os",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "IELTS OS: a local-first personal AI IELTS study workbench (target band 7.0).",
   "scripts": {
     "dev": "next dev -p 3100",
@@ -11,7 +12,7 @@
     "test": "vitest run"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "dependencies": {
     "clsx": "^2.1.1",
